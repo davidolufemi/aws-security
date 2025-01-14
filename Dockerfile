@@ -1,8 +1,8 @@
-FROM openjdk:8-jre-alpine
+FROM openjdk:8
 
-EXPOSE 8080
+RUN apt-get update && \
+    apt-get install build-essential maven default-jdk cowsay netcat -y && \
+    update-alternatives --config javac
+COPY . .
 
-COPY ./build/libs/my-app-1.0-SNAPSHOT.jar /usr/app/
-WORKDIR /usr/app
-
-ENTRYPOINT ["java", "-jar", "my-app-1.0-SNAPSHOT.jar"]
+CMD ["mvn", "spring-boot:run"]
