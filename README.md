@@ -1,25 +1,51 @@
-# Vulnado - Intentionally Vulnerable Java Application
+# Vulnerable Java application
 
-This application and exercises will take you through some of the OWASP top 10 Vulnerabilities and how to prevent them.
+This repository contains a sample application, the "Websites Tester Service", that's vulnerable to a [Command Injection](https://owasp.org/www-community/attacks/Command_Injection) and [Server-Side Request Forgery (SSRF)](https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/) vulnerability.
 
-## Up and running
+> **Warning**
+> This application is purposely vulnerable and can trivially be hacked. Don't expose it to the Internet, and don't run it in a production environment.
+> Instead, you can run it locally on your machine, or in a cloud environment on a private VPC.
 
-1. Install Docker for [MacOS](https://hub.docker.com/editions/community/docker-ce-desktop-mac) or [Windows](https://hub.docker.com/editions/community/docker-ce-desktop-windows). You'll need to create a Docker account if you don't already have one.
-2. `git clone git://github.com/ScaleSec/vulnado`
-3. `cd vulnado`
-4. `docker-compose up`
-5. Open a browser and navigate to the client to make sure it's working: [http://localhost:1337](http://localhost:1337)
-6. Then back in your terminal verify you have connection to your API server: `nc -vz localhost 8080`
+## Running locally
 
-## Architecture
+1. Build the image locally, or use `ghcr.io/datadog/vulnerable-java-application`:
+2. Run:
 
-The docker network created by `docker-compose` maps pretty well to a multi-tier architecture where a web server is publicly available and there are other network resources like a database and internal site that are not publicly available.
+```
+docker run --rm -p 8000:8000 ghcr.io/datadog/vulnerable-java-application
+```
 
-![](exercises/assets/arch.png)
+3. You can then access the web application at http://127.0.0.1:8000
 
-## Exercises
+## Running on Kubernetes
 
-* [SQL Injection](exercises/01-sql-injection.md)
-* [XSS - Cross Site Scripting](exercises/02-xss.md)
-* [SSRF - Server Side Request Forgery](exercises/03-ssrf.md)
-* [RCE - Remote Code Execution & Reverse Shell](exercises/04-rce-reverse-shell.md)
+```
+kubectl run  vulnerable-application --port=8000 --expose=true --image ghcr.io/datadog/vulnerable-java-application
+kubectl port-forward pod/vulnerable-application 8000
+```
+
+You can then access the web application at http://127.0.0.1:8000
+
+## Exploitation
+
+### Server-side request vulnerability
+
+1. Browse to http://127.0.0.1:8000/website.html
+2. Note how the input allows you to specify arbitrary URLs such as `http://google.com`, but also any internal IP such as `http://169.254.169.254/latest/meta-data/`
+3. When the applications is running in AWS, Azure or GCP, this can often be exploited to retrieve instance metadata credentials
+
+### Command injection vulnerability
+
+1. Browse to http://127.0.0.1:8000/index.html
+2. Note how the input allows you to specify domain names such as `google.com` and ping them
+3. Note that there is some level of input validation - entering `$(whoami)` returns `Invalid domain name: $(whoami) - don't try to hack us!`
+4. However, the validation is buggy - notice how you can start the input with a domain name, and execute and command in the container!
+
+### Local file read vulnerability
+
+1. Browse to http://127.0.0.1:8000/file.html
+2. Note how the input allows you to specify file names such as `/tmp/files/hello.txt` and read them
+3. Note that there is some level of input validation - entering `/etc/passwd` returns `You are not allowed to read /etc/passwd`
+4. However, the validation is buggy and vulnerable to path traversal. For instance, you can enter `/tmp/files/../../etc/passwd` to bypass the validation and read any file on the local filesystem.
+
+![image](https://user-images.githubusercontent.com/136675/186954376-e3d82d03-7d9e-49b3-a106-6da080980dae.png)
